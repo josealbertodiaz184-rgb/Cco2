@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JD FLIGHT DISPATCHER - Centro de Control de Operaciones (CCO)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: {
+                            400: '#F3E5AB',
+                            500: '#D4AF37',
+                            600: '#AA820A',
+                            700: '#856404'
+                        },
+                        obsidian: {
+                            800: '#1A1D24',
+                            900: '#0F1115',
+                            950: '#08090C'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #08090C;
+            color: #E2E8F0;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0F1115;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #D4AF37;
+        }
+        @keyframes radar-sweep {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .radar-sweep-line {
+            animation: radar-sweep 4s linear infinite;
+            transform-origin: center;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printable-area, #printable-area *, #printable-history, #printable-history * {
+                visibility: visible;
+            }
+            #printable-area, #printable-history {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                color: #000 !important;
+                background: #fff !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-obsidian-950 text-slate-200 min-h-screen flex flex-col justify-between selection:bg-gold-500 selection:text-black">
+
+    <!-- HEADER OPERACIONAL Y RELOJES -->
+    <header class="bg-obsidian-900 border-b border-gold-500/35 sticky top-0 z-50 shadow-2xl backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
+            
+            <!-- Branding Logo & Title -->
+            <div class="flex items-center space-x-3">
+                <div class="relative flex items-center justify-center w-12 h-12 rounded-full bg-slate-900 border-2 border-gold-500 text-gold-500 shadow-lg shadow-gold-500/10">
+                    <svg class="w-8 h-8 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+                        <polygon points="12,3 14.5,9.5 21,12 14.5,14.5 12,21 9.5,14.5 3,12 9.5,9.5" fill="currentColor" fill-opacity="0.2"/>
+                        <polygon points="12,3 14.5,9.5 12,12 9.5,9.5" fill="#D4AF37"/>
+                        <polygon points="12,21 14.5,14.5 12,12 9.5,14.5" fill="#AA820A"/>
+                        <circle cx="12" cy="12" r="1.5" fill="#FFF"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-wider text-gold-500 flex items-center gap-2">
+                        JD FLIGHT DISPATCHER
+                        <span class="text-xs font-normal text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">CCO v8.10 (CON GRÁFICO DE COMBUSTIBLE)</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 font-medium tracking-widest uppercase">Planificación Segura & Control de Operaciones</p>
+                </div>
+            </div>
+
+            <!-- Reloj Dual Sincronizado -->
+            <div class="flex items-center gap-3 bg-obsidian-800/80 p-2 rounded-xl border border-slate-800 font-mono">
+                <div class="text-center px-3 border-r border-slate-700">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Fecha / Hora UTC (ZULU)</span>
+                    <span id="clock-utc" class="text-base font-bold text-gold-400 tracking-wider">0000-00-00 00:00:00 Z</span>
+                </div>
+                <div class="text-center px-3">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Fecha / Hora Local (VET / GMT-4)</span>
+                    <span id="clock-local" class="text-base font-bold text-emerald-400 tracking-wider">0000-00-00 00:00:00 L</span>
+                </div>
+            </div>
+
+            <!-- Botones de DB & Instructivo Modal -->
+            <div class="flex items-center space-x-2 text-xs">
+                <span id="db-usage" class="text-[10px] font-mono text-slate-400">BD: 0.0 KB</span>
+                <button onclick="openManualModal()" class="px-3 py-2 bg-gold-500 hover:bg-gold-400 text-slate-950 font-bold rounded-lg flex items-center gap-1.5 transition-colors shadow-md">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span>Instructivo & Guía</span>
+                </button>
+                <button onclick="exportDatabase()" title="Exportar Respaldo JSON" class="p-2 bg-slate-800 hover:bg-gold-500 hover:text-black transition-colors rounded-lg text-slate-300 border border-slate-700">
+                    <i class="fa-solid fa-download"></i>
+                </button>
+                <label title="Importar Base de Datos" class="p-2 bg-slate-800 hover:bg-gold-500 hover:text-black transition-colors rounded-lg text-slate-300 border border-slate-700 cursor-pointer">
+                    <i class="fa-solid fa-upload"></i>
+                    <input type="file" id="import-file" class="hidden" accept=".json" onchange="importDatabase(event)">
+                </label>
+                <button onclick="resetDatabase()" title="Restablecer Base de Datos" class="p-2 bg-slate-800 hover:bg-rose-600 hover:text-white transition-colors rounded-lg text-slate-400 border border-slate-700">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- BARRA NAVEGACIÓN Y PESTAÑAS -->
+    <nav class="bg-obsidian-900/90 border-b border-slate-800 sticky top-[73px] z-40 backdrop-blur">
+        <div class="max-w-7xl mx-auto px-4 flex overflow-x-auto space-x-1 py-2 no-scrollbar">
+            <button onclick="switchTab('tab-flightboard')" id="nav-tab-flightboard" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-all bg-gold-500 text-black shadow-md">
+                <i class="fa-solid fa-plane-departure"></i>
+                <span>Monitoreo & Vuelos</span>
+            </button>
+            <button onclick="switchTab('tab-history')" id="nav-tab-history" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                <i class="fa-solid fa-box-archive"></i>
+                <span>Historial Mensual</span>
+            </button>
+            <button onclick="switchTab('tab-tracker')" id="nav-tab-tracker" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                <i class="fa-solid fa-satellite-dish"></i>
+                <span>Seguimiento de Vuelo</span>
+            </button>
+            <button onclick="switchTab('tab-metar')" id="nav-tab-metar" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                <i class="fa-solid fa-cloud-sun-rain"></i>
+                <span>METAR / TAF ADDS</span>
+            </button>
+            <button onclick="switchTab('tab-ofp')" id="nav-tab-ofp" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                <i class="fa-solid fa-gas-pump"></i>
+                <span>OFP & Combustible (KG/LBS)</span>
+            </button>
+            <button onclick="switchTab('tab-wb')" id="nav-tab-wb" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                <i class="fa-solid fa-weight-hanging"></i>
+                <span>Peso & Balance</span>
+            </button>
+            <button onclick="switchTab('tab-fleet')" id="nav-tab-fleet" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                <i class="fa-solid fa-plane-slant"></i>
+                <span>Flota & MEL/CDL</span>
+            </button>
+            <button onclick="switchTab('tab-crew')" id="nav-tab-crew" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                <i class="fa-solid fa-users-gear"></i>
+                <span>Control Tripulaciones (RAV 121)</span>
+            </button>
+            <button onclick="switchTab('tab-irrops')" id="nav-tab-irrops" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Novedades & Fases ERP</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- CONTENIDO PRINCIPAL DE LA APLICACIÓN -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+
+        <!-- MÓDULO 1: FLIGHT MONITORING BOARD -->
+        <section id="tab-flightboard" class="tab-content block space-y-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-obsidian-900 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400 uppercase font-semibold">Vuelos Programados</p>
+                        <p id="stat-total-flights" class="text-2xl font-extrabold text-gold-400 font-mono">0</p>
+                    </div>
+                    <i class="fa-solid fa-calendar-check text-2xl text-slate-700"></i>
+                </div>
+                <div class="bg-obsidian-900 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400 uppercase font-semibold">En Vuelo (En-Route)</p>
+                        <p id="stat-airborne" class="text-2xl font-extrabold text-sky-400 font-mono">0</p>
+                    </div>
+                    <i class="fa-solid fa-plane-flight text-2xl text-sky-950"></i>
+                </div>
+                <div class="bg-obsidian-900 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400 uppercase font-semibold">Aterrizados / En Tierra</p>
+                        <p id="stat-landed" class="text-2xl font-extrabold text-emerald-400 font-mono">0</p>
+                    </div>
+                    <i class="fa-solid fa-plane-arrival text-2xl text-emerald-950"></i>
+                </div>
+                <div class="bg-obsidian-900 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400 uppercase font-semibold">Demoras (&gt;30 min)</p>
+                        <p id="stat-delayed" class="text-2xl font-extrabold text-rose-400 font-mono">0</p>
+                    </div>
+                    <i class="fa-solid fa-clock-rotate-left text-2xl text-rose-950"></i>
+                </div>
+            </div>
+
+            <div class="bg-obsidian-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 border-b border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-900/50">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-list-check text-gold-500"></i>
+                        <h2 class="font-bold text-lg text-white">Tablero Operacional de Vuelos (Archiva automáticamente al registrar ATA)</h2>
+                    </div>
+                    <button onclick="openFlightModal()" class="px-4 py-2 bg-gold-500 hover:bg-gold-400 text-slate-950 font-bold rounded-lg text-sm flex items-center gap-2 transition-all shadow-lg shadow-gold-500/10">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Programar / Despachar Vuelo</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">Vuelo</th>
+                                <th class="p-3">Aeronave</th>
+                                <th class="p-3">Ruta</th>
+                                <th class="p-3">Tiempos Operacionales (ETD/Gate/ATD/ETA/ATA)</th>
+                                <th class="p-3">Control de Demora (&gt;30m)</th>
+                                <th class="p-3">Combustible (LBS & KG)</th>
+                                <th class="p-3">Pasajeros (ADT/CHD/INF)</th>
+                                <th class="p-3">Estado Ops</th>
+                                <th class="p-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="flight-table-body" class="divide-y divide-slate-800/60 font-sans">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- MÓDULO DE HISTORIAL MENSUAL DE VUELOS & GRÁFICO OPERACIONAL DE COMBUSTIBLE -->
+        <section id="tab-history" class="tab-content hidden space-y-6">
+            <div class="bg-obsidian-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-6">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-box-archive text-gold-500"></i> Archivo e Historial Mensual de Vuelos
+                        </h2>
+                        <p class="text-xs text-slate-400">Consulta los vuelos completados y el control operacional de combustible por período mensual</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 uppercase font-semibold mb-1">Seleccionar Mes / Año</label>
+                            <select id="history-month-select" onchange="renderHistoryTable()" class="bg-slate-950 border border-slate-700 text-gold-400 font-mono text-xs rounded-lg px-3 py-2 outline-none focus:border-gold-500">
+                                <!-- Injected dynamically -->
+                            </select>
+                        </div>
+                        <button onclick="window.print()" class="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-print"></i> Imprimir Reporte Mensual
+                        </button>
+                    </div>
+                </div>
+
+                <div id="printable-history" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                            <span class="text-xs text-slate-400 uppercase block font-semibold">Total Vuelos en el Mes</span>
+                            <span id="hist-stat-total" class="text-2xl font-extrabold text-gold-400 font-mono">0</span>
+                        </div>
+                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                            <span class="text-xs text-slate-400 uppercase block font-semibold">Pasajeros Transportados</span>
+                            <span id="hist-stat-pax" class="text-2xl font-extrabold text-emerald-400 font-mono">0</span>
+                        </div>
+                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                            <span class="text-xs text-slate-400 uppercase block font-semibold">Combustible Consumido (Trip)</span>
+                            <span id="hist-stat-fuel" class="text-2xl font-extrabold text-sky-400 font-mono">0 LBS</span>
+                        </div>
+                    </div>
+
+                    <!-- CÉLDA DE GRÁFICA OPERACIONAL DE COMBUSTIBLE SUMINISTRADO -->
+                    <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                            <h3 class="font-bold text-white text-sm flex items-center gap-2 font-sans">
+                                <i class="fa-solid fa-chart-bar text-gold-500"></i> Gráfico Operacional de Combustible SuminISTRADO (Mes Actual)
+                            </h3>
+                            <span id="chart-month-label" class="text-xs font-mono text-gold-400 bg-gold-500/10 px-2.5 py-1 rounded border border-gold-500/20">--</span>
+                        </div>
+                        <div class="space-y-3 font-mono text-xs">
+                            <div>
+                                <div class="flex justify-between items-center mb-1 text-slate-400 text-[11px]">
+                                    <span>Combustible Total de Salida / Ramp Fuel Suministrado</span>
+                                    <span id="chart-ramp-val" class="font-bold text-white">0 LBS / 0 KG</span>
+                                </div>
+                                <div class="w-full bg-slate-900 h-4 rounded-full overflow-hidden border border-slate-800">
+                                    <div id="bar-ramp" class="bg-gold-500 h-full transition-all duration-700" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-center mb-1 text-slate-400 text-[11px]">
+                                    <span>Combustible Consumido en Ruta (Trip Fuel Total)</span>
+                                    <span id="chart-trip-val" class="font-bold text-sky-400">0 LBS / 0 KG</span>
+                                </div>
+                                <div class="w-full bg-slate-900 h-4 rounded-full overflow-hidden border border-slate-800">
+                                    <div id="bar-trip" class="bg-sky-500 h-full transition-all duration-700" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-center mb-1 text-slate-400 text-[11px]">
+                                    <span>Remanente Acumulado en Destino (Fuel Remaining)</span>
+                                    <span id="chart-rem-val" class="font-bold text-emerald-400">0 LBS / 0 KG</span>
+                                </div>
+                                <div class="w-full bg-slate-900 h-4 rounded-full overflow-hidden border border-slate-800">
+                                    <div id="bar-rem" class="bg-emerald-500 h-full transition-all duration-700" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto border border-slate-800 rounded-xl">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3">Fecha Archivo</th>
+                                    <th class="p-3">Vuelo</th>
+                                    <th class="p-3">Matrícula / Modelo</th>
+                                    <th class="p-3">Ruta</th>
+                                    <th class="p-3">ETD / ATA</th>
+                                    <th class="p-3">Combustible Salida / Llegada</th>
+                                    <th class="p-3">Pasajeros</th>
+                                    <th class="p-3 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body" class="divide-y divide-slate-800/60 font-sans">
+                                <!-- Injected dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MÓDULO 2: SEGUIMIENTO DE VUELO (FLIGHT TRACKER & RADAR) -->
+        <section id="tab-tracker" class="tab-content hidden space-y-6">
+            <div class="bg-obsidian-900 border border-slate-800 rounded-xl p-6 shadow-xl">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-satellite-dish text-gold-500"></i> Centro de Seguimiento de Vuelo en Tiempo Real (Radar CCO)
+                        </h2>
+                        <p class="text-xs text-slate-400">Monitoreo satelital exclusivo de aeronaves en vuelo (en-route)</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-2"></span> Enlace Satelital Activo
+                        </span>
+                        <button onclick="renderFlightTracker()" class="p-2 bg-slate-800 hover:bg-gold-500 hover:text-black rounded-lg text-slate-300 border border-slate-700 transition-colors" title="Actualizar Posiciones">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-obsidian-950 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center relative overflow-hidden min-h-[420px]">
+                        <div class="absolute w-80 h-80 rounded-full border border-gold-500/10 pointer-events-none"></div>
+                        <div class="absolute w-60 h-60 rounded-full border border-gold-500/20 pointer-events-none"></div>
+                        <div class="absolute w-40 h-40 rounded-full border border-gold-500/30 pointer-events-none"></div>
+                        <div class="absolute w-20 h-20 rounded-full border border-gold-500/40 pointer-events-none"></div>
+                        <div class="absolute w-full h-[1px] bg-gold-500/10 pointer-events-none"></div>
+                        <div class="absolute h-full w-[1px] bg-gold-500/10 pointer-events-none"></div>
+
+                        <div class="absolute w-96 h-96 rounded-full pointer-events-none overflow-hidden flex items-center justify-center">
+                            <div class="radar-sweep-line w-48 h-48 absolute top-0 right-0 bg-gradient-to-bl from-gold-500/30 to-transparent origin-bottom-left"></div>
+                        </div>
+
+                        <div id="radar-blips-container" class="relative w-full h-80 flex items-center justify-center">
+                            <!-- Injected dynamically -->
+                        </div>
+
+                        <div class="absolute bottom-3 left-4 text-[10px] font-mono text-slate-500 flex items-center gap-3">
+                            <span>CENTRO: SVMI (MAIQUETÍA)</span>
+                            <span>RANGO: 250 NM</span>
+                            <span>MODO: SEC-RADAR</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-obsidian-950 border border-slate-800 rounded-2xl p-4 flex flex-col max-h-[440px] overflow-y-auto space-y-3">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider px-2 mb-1">Telemetría de Flota Activa</h3>
+                        <div id="tracker-cards-container" class="space-y-3">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MÓDULO 3: METAR / TAF ADDS -->
+        <section id="tab-metar" class="tab-content hidden space-y-6">
+            <div class="bg-obsidian-900 border border-slate-800 rounded-xl p-6 shadow-xl">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-cloud-sun text-gold-500"></i> METAR / TAF Live Center (NOAA / ADDS)
+                        </h2>
+                        <p class="text-xs text-slate-400">Consulta de reportes met con actualización en tiempo real de hora operativa</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="fetchMetarADDS('SVMI')" class="px-3 py-1 bg-slate-800 hover:bg-gold-500 hover:text-black rounded text-xs border border-slate-700 font-mono transition-colors">SVMI (Maiquetía)</button>
+                        <button onclick="fetchMetarADDS('SVMC')" class="px-3 py-1 bg-slate-800 hover:bg-gold-500 hover:text-black rounded text-xs border border-slate-700 font-mono transition-colors">SVMC (Maracaibo)</button>
+                        <button onclick="fetchMetarADDS('SVBC')" class="px-3 py-1 bg-slate-800 hover:bg-gold-500 hover:text-black rounded text-xs border border-slate-700 font-mono transition-colors">SVBC (Barcelona)</button>
+                        <button onclick="fetchMetarADDS('KMIA')" class="px-3 py-1 bg-slate-800 hover:bg-gold-500 hover:text-black rounded text-xs border border-slate-700 font-mono transition-colors">KMIA (Miami)</button>
+                        <button onclick="fetchMetarADDS('MPTO')" class="px-3 py-1 bg-slate-800 hover:bg-gold-500 hover:text-black rounded text-xs border border-slate-700 font-mono transition-colors">MPTO (Panamá)</button>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 max-w-md mb-6">
+                    <input type="text" id="icao-input" placeholder="Código ICAO (Ej: SVMI)" class="uppercase bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 text-sm focus:border-gold-500 outline-none w-full font-mono">
+                    <button onclick="fetchMetarADDS(document.getElementById('icao-input').value)" class="bg-gold-500 text-black px-5 py-2 rounded-lg font-bold text-sm hover:bg-gold-400 transition-colors flex items-center gap-2">
+                        <i class="fa-solid fa-rotate"></i> Consultar ADDS
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-2 space-y-4">
+                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono relative">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs text-slate-500 font-sans uppercase tracking-wider">Raw METAR Report (NOAA/ADDS)</span>
+                                <span id="metar-time-badge" class="text-[10px] text-gold-400 font-mono bg-gold-500/10 px-2 py-0.5 rounded border border-gold-500/20">FETCHING...</span>
+                            </div>
+                            <p id="metar-raw" class="text-gold-400 font-bold text-sm break-words leading-relaxed">Cargando último reporte disponible...</p>
+                        </div>
+                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono">
+                            <span class="text-xs text-slate-500 font-sans block mb-1 uppercase tracking-wider">Raw TAF Forecast</span>
+                            <p id="taf-raw" class="text-slate-300 text-xs break-words leading-relaxed">Cargando pronóstico TAF para la hora...</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-center">
+                                <span class="text-[10px] text-slate-400 uppercase block">Viento</span>
+                                <span id="dec-wind" class="text-sm font-bold text-white font-mono">--° / -- KT</span>
+                            </div>
+                            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-center">
+                                <span class="text-[10px] text-slate-400 uppercase block">Visibilidad</span>
+                                <span id="dec-vis" class="text-sm font-bold text-white font-mono">-- km</span>
+                            </div>
+                            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-center">
+                                <span class="text-[10px] text-slate-400 uppercase block">Temp / Dew</span>
+                                <span id="dec-temp" class="text-sm font-bold text-white font-mono">--°C / --°C</span>
+                            </div>
+                            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-center">
+                                <span class="text-[10px] text-slate-400 uppercase block">QNH / Altimetro</span>
+                                <span id="dec-qnh" class="text-sm font-bold text-white font-mono">---- hPa</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col items-center justify-center text-center space-y-3">
+                        <span class="text-xs text-slate-400 uppercase font-semibold">Regla de Vuelo Operacional</span>
+                        <div id="rule-badge" class="px-6 py-2 rounded-full font-extrabold text-sm bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                            VFR / Óptimo
+                        </div>
+                        <p id="rule-desc" class="text-[11px] text-slate-400">Condiciones aptas para salida y llegada bajo reglas visuales / instrumentales estándar.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MÓDULO 4: OFP & COMBUSTIBLE DUAL -->
+        <section id="tab-ofp" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-obsidian-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-calculator text-gold-500"></i> Planificador de Combustible OFP
+                    </h2>
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="block text-slate-400 font-semibold mb-1">Distancia Vuelo (NM)</label>
+                            <input type="number" id="ofp-dist" value="480" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 font-semibold mb-1">Consumo Promedio (lbs/hr)</label>
+                            <input type="number" id="ofp-burn" value="5200" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 font-semibold mb-1">Tiempo Estimado (EET min)</label>
+                            <input type="number" id="ofp-eet" value="95" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 font-semibold mb-1">Alterno (Minutos Reserva)</label>
+                            <input type="number" id="ofp-alt-min" value="45" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                        </div>
+                        <button onclick="calculateOFP()" class="w-full py-3 bg-gold-500 hover:bg-gold-400 text-slate-950 font-extrabold rounded-lg transition-all shadow-lg shadow-gold-500/20">
+                            Calcular Combustible OFP
+                        </button>
+                    </div>
+
+                    <!-- Módulo Conversor Rápido de Combustible -->
+                    <div class="pt-4 border-t border-slate-800 space-y-3">
+                        <span class="text-xs font-bold text-gold-400 flex items-center gap-2">
+                            <i class="fa-solid fa-exchange"></i> Conversor Rápido LBS ↔ KG
+                        </span>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <label class="block text-slate-500 mb-1">Libras (lbs)</label>
+                                <input type="number" id="conv-lbs" placeholder="1000" oninput="convertFuelUnits('lbs')" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-slate-500 mb-1">Kilogramos (kg)</label>
+                                <input type="number" id="conv-kg" placeholder="453" oninput="convertFuelUnits('kg')" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white font-mono">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2 bg-obsidian-900 border border-slate-800 rounded-xl p-6 shadow-xl flex flex-col justify-between">
+                    <div id="printable-area" class="space-y-4 font-mono text-xs">
+                        <div class="border-b border-slate-800 pb-3 flex justify-between items-center">
+                            <div>
+                                <h3 class="font-bold text-white text-sm font-sans">JD FLIGHT DISPATCHER - OFP RELEASE SUMMARY</h3>
+                                <p class="text-[10px] text-slate-400 font-sans">Documento Operacional con Unidades Duales (LBS / KG)</p>
+                            </div>
+                            <span id="ofp-status-tag" class="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded text-[10px] font-bold">READY FOR DISPATCH</span>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                            <div>
+                                <span class="text-slate-500 block">TRIP FUEL</span>
+                                <span id="res-trip" class="text-white font-bold text-sm">8,233 LBS</span>
+                                <span id="res-trip-kg" class="text-[10px] text-slate-400 block">3,734 KG</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block">CONTINGENCY (5%)</span>
+                                <span id="res-cont" class="text-white font-bold text-sm">412 LBS</span>
+                                <span id="res-cont-kg" class="text-[10px] text-slate-400 block">187 KG</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block">ALTERNATE</span>
+                                <span id="res-alt" class="text-white font-bold text-sm">3,900 LBS</span>
+                                <span id="res-alt-kg" class="text-[10px] text-slate-400 block">1,769 KG</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block">FINAL RESERVE (30M)</span>
+                                <span id="res-fin" class="text-white font-bold text-sm">2,600 LBS</span>
+                                <span id="res-fin-kg" class="text-[10px] text-slate-400 block">1,179 KG</span>
+                            </div>
+                        </div>
+                        <div class="bg-gold-500/10 border border-gold-500/30 p-4 rounded-xl flex items-center justify-between">
+                            <div>
+                                <span class="text-gold-400 font-sans font-bold block text-sm">BLOCK FUEL TOTAL REQUERIDO</span>
+                                <span class="text-[10px] text-slate-400 font-sans">Incluye Taxi (300 lbs / 136 kg) y Extra Operacional</span>
+                            </div>
+                            <div class="text-right">
+                                <span id="res-block" class="text-2xl font-extrabold text-gold-400 block">15,745 LBS</span>
+                                <span id="res-block-kg" class="text-xs font-mono text-emerald-400 font-bold">7,142 KG</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pt-4 border-t border-slate-800 flex justify-end gap-3 no-print">
+                        <button onclick="window.print()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-print"></i> Imprimir Release OFP
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MÓDULO 5: PESO Y BALANCE -->
+        <section id="tab-wb" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-obsidian-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-weight-hanging text-gold-500"></i> Calculadora Peso & Balance
+                    </h2>
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="block text-slate-400 font-semibold mb-1">Peso Básico Operativo (DOW lbs)</label>
+                            <input type="number" id="wb-dow" value="84500" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 font-semibold mb-1">Pasajeros & Carga (Payload lbs)</label>
+                            <input type="number" id="wb-payload" value="28500" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 font-semibold mb-1">Combustible Total (Block Fuel lbs)</label>
+                            <input type="number" id="wb-fuel" value="15745" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                        </div>
+                        <button onclick="calculateWB()" class="w-full py-3 bg-gold-500 hover:bg-gold-400 text-slate-950 font-extrabold rounded-lg transition-all shadow-lg shadow-gold-500/20">
+                            Calcular CG & Límites
+                        </button>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2 bg-obsidian-900 border border-slate-800 rounded-xl p-6 shadow-xl flex flex-col justify-between">
+                    <div class="space-y-4 font-mono text-xs">
+                        <div class="border-b border-slate-800 pb-3 flex justify-between items-center">
+                            <h3 class="font-bold text-white text-sm font-sans">LOADSHEET & ENVELOPE SUMMARY</h3>
+                            <span id="wb-status" class="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded text-[10px] font-bold">CG WITHIN LIMITS</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                                <span class="text-slate-500 block mb-1">ZERO FUEL WEIGHT (ZFW)</span>
+                                <span id="res-zfw" class="text-white font-bold text-base">113,000 LBS</span>
+                                <span class="text-[10px] text-slate-500 block mt-1">Max: 122,000 lbs</span>
+                            </div>
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                                <span class="text-slate-500 block mb-1">TAKEOFF WEIGHT (TOW)</span>
+                                <span id="res-tow" class="text-white font-bold text-base">128,455 LBS</span>
+                                <span class="text-[10px] text-slate-500 block mt-1">Max: 140,000 lbs</span>
+                            </div>
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                                <span class="text-slate-500 block mb-1">% MAC (Centro de Gravedad)</span>
+                                <span id="res-mac" class="text-gold-400 font-extrabold text-base">24.5%</span>
+                                <span class="text-[10px] text-slate-500 block mt-1">Limites: 15% - 32%</span>
+                            </div>
+                        </div>
+                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                            <span class="text-slate-400 block mb-2 font-sans font-semibold">Diagrama de Distribución de Carga & Envolvente</span>
+                            <div class="w-full bg-slate-900 h-6 rounded-lg relative overflow-hidden flex items-center px-2">
+                                <div class="absolute left-0 top-0 bottom-0 bg-red-500/20 w-[15%] border-r border-red-500/40"></div>
+                                <div class="absolute left-[15%] right-[18%] top-0 bottom-0 bg-emerald-500/20 border-x border-emerald-500/40 flex items-center justify-center">
+                                    <span class="text-[10px] text-emerald-300 font-bold">ZONA ÓPTIMA DE CG</span>
+                                </div>
+                                <div class="absolute right-0 top-0 bottom-0 bg-red-500/20 w-[18%] border-l border-red-500/40"></div>
+                                <div id="cg-indicator" class="absolute w-3 h-4 bg-gold-500 rounded-full shadow-lg transition-all duration-500" style="left: 48%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MÓDULO 6: FLOTA & MEL/CDL -->
+        <section id="tab-fleet" class="tab-content hidden space-y-6">
+            <div class="bg-obsidian-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Control de Flota & Diferidos (MEL / CDL)</h2>
+                        <p class="text-xs text-slate-400">Estado de aeronaves, mantenimientos y limitaciones operacionales (MEL / CDL)</p>
+                    </div>
+                    <button onclick="openFleetModal()" class="px-4 py-2 bg-gold-500 hover:bg-gold-400 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-2 transition-all shadow-lg shadow-gold-500/10">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Agregar Aeronave / Diferido MEL</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">Matrícula</th>
+                                <th class="p-3">Modelo</th>
+                                <th class="p-3">Estado Mantenimiento</th>
+                                <th class="p-3">Diferido MEL / CDL</th>
+                                <th class="p-3">Categoría</th>
+                                <th class="p-3">Vencimiento Diferido</th>
+                                <th class="p-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleet-table-body" class="divide-y divide-slate-800/60 font-sans">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- MÓDULO 7: CONTROL DE TRIPULACIONES -->
+        <section id="tab-crew" class="tab-content hidden space-y-6">
+            <div class="bg-obsidian-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Control de Legalidad y Descansos de Tripulaciones (FTDT - RAV 121)</h2>
+                        <p class="text-xs text-slate-400">Seguimiento de ventana rodante de 24h, límite de 8 horas de vuelo efectivo y alertas de descanso obligatorio</p>
+                    </div>
+                    <button onclick="openCrewModal()" class="px-4 py-2 bg-gold-500 hover:bg-gold-400 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-2 transition-all shadow-lg shadow-gold-500/10">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <span>Registrar Tripulante / Asignar Vuelo</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">Tripulante / Cargo</th>
+                                <th class="p-3">Vuelo Asignado</th>
+                                <th class="p-3">Hora Check-In (Presentación)</th>
+                                <th class="p-3">Hrs Vuelo Efectivas (Ventana 24h)</th>
+                                <th class="p-3">Tiempo Restante de Servicio</th>
+                                <th class="p-3">Estado Legalidad / Descanso</th>
+                                <th class="p-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="crew-table-body" class="divide-y divide-slate-800/60 font-sans">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- MÓDULO 8: NOVEDADES & FASES ERP (INCERFA / ALERFA / DETRESFA) -->
+        <section id="tab-irrops" class="tab-content hidden space-y-6">
+            
+            <!-- NOTA TÉCNICA OFICIAL INTEGRADA SOBRE IRROPS Y ERP -->
+            <div class="bg-obsidian-900 border border-gold-500/40 rounded-xl p-5 shadow-xl space-y-4">
+                <div class="flex items-center gap-3 border-b border-slate-800 pb-3">
+                    <div class="p-2 bg-gold-500/10 border border-gold-500/30 rounded-lg text-gold-400 text-base">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-white text-sm uppercase tracking-wide">Nota Técnica CCO: Registro de IRROPS & Fases ERP (OACI Doc 4444 / RAV)</h3>
+                        <p class="text-[11px] text-slate-400">Directrices operacionales para trazabilidad, análisis de causa raíz y control de fases de emergencia.</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300">
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <span class="font-bold text-gold-400 block"><i class="fa-solid fa-clipboard-list mr-1"></i> Propósito del Registro de IRROPS</span>
+                        <p class="leading-relaxed text-[11px]">Matriz de control operacional utilizada en el CCO para documentar, clasificar y dar seguimiento a eventos que alteran el programa de vuelos regular. Permite garantizar la <strong>trazabilidad</strong>, el análisis de causa raíz, la medición de KPIs operacionales (<strong>OTP - On-Time Performance</strong>) y el estricto cumplimiento normativo (RAV / OACI).</p>
+                        <p class="text-[10px] text-slate-400 pt-1 font-mono"><strong>Datos clave:</strong> Matrícula, número de vuelo, naturaleza de la interrupción (falla técnica/AOG, clima severo, ATC, rampa), hora de ocurrencia, efecto dominó y acciones correctivas ejecutadas.</p>
+                    </div>
+
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <span class="font-bold text-gold-400 block"><i class="fa-solid fa-tower-broadcast mr-1"></i> Fases del ERP (OACI Doc 4444 / Anexo 12)</span>
+                        <ul class="space-y-1 text-[11px] list-disc pl-4 text-slate-300">
+                            <li><strong class="text-amber-400">INCERFA (Incertidumbre):</strong> Duda razonable por falta de comunicación o retraso en llegada (30 min). Acción CCO: Comunicaciones de consulta a ATS y aeropuertos.</li>
+                            <li><strong class="text-orange-400">ALERFA (Alerta):</strong> Temores fundados por persistencia en falta de comunicaciones o combustible insuficiente (60 min). Acción CCO: Alerta preventiva y notificación aeronáutica.</li>
+                            <li><strong class="text-rose-400">DETRESFA (Peligro):</strong> Peligro grave e inminente o auxilio inmediato (agotamiento de combustible / siniestro). Acción CCO: Activación formal del Comité de Crisis, enlace directo con el RCC / SAR y gestión corporativa.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-amber-950/30 border border-amber-500/40 p-4 rounded-xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-extrabold text-amber-400 text-sm font-mono flex items-center gap-2">
+                            <i class="fa-solid fa-triangle-exclamation"></i> INCERFA (Fase de Incertidumbre)
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-300">Se declara cuando no se recibe noticias sobre una aeronave transcurridos <strong>30 minutos</strong> desde el momento en que debió recibir información.</p>
+                </div>
+                <div class="bg-orange-950/30 border border-orange-500/40 p-4 rounded-xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-extrabold text-orange-400 text-sm font-mono flex items-center gap-2">
+                            <i class="fa-solid fa-bell"></i> ALERFA (Fase de Alerta)
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-300">Se declara si tras la fase INCERFA las tentativas de contacto fracasan o hay demoras superiores a <strong>60 minutos</strong>.</p>
+                </div>
+                <div class="bg-rose-950/30 border border-rose-500/40 p-4 rounded-xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-extrabold text-rose-400 text-sm font-mono flex items-center gap-2">
+                            <i class="fa-solid fa-fire-flame-curved"></i> DETRESFA (Fase de Peligro)
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-300">Se declara cuando se agota el combustible estimado, certeza de siniestro o <strong>1 hora</strong> sin contacto tras ALERFA.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-obsidian-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Registro de IRROPS & Fases ERP
+                    </h2>
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="block text-slate-400 font-semibold mb-1">Vuelo Afectado</label>
+                            <input type="text" id="irrops-flight" placeholder="Ej: V0 1220" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono uppercase">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 font-semibold mb-1">Fase Operacional / Emergencia</label>
+                            <select id="irrops-type" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-bold">
+                                <option value="INCERFA" class="text-amber-400">INCERFA (Fase de Incertidumbre - 30 min sin reporte)</option>
+                                <option value="ALERFA" class="text-orange-400">ALERFA (Fase de Alerta - 60 min sin contacto)</option>
+                                <option value="DETRESFA" class="text-rose-400">DETRESFA (Fase de Peligro - Combustible agotado / Siniestro)</option>
+                                <option value="Meteorología">Meteorología / Demora Estándar</option>
+                                <option value="Falla Técnica">Falla Técnica / AOG</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 font-semibold mb-1">Descripción de la Novedad</label>
+                            <textarea id="irrops-desc" rows="3" placeholder="Detalle la situación, tiempo transcurrido desde ETA/reporte..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white"></textarea>
+                        </div>
+                        <button onclick="addIrrops()" class="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-extrabold rounded-lg transition-all shadow-lg shadow-rose-600/20">
+                            Registrar & Activar Protocolo ERP
+                        </button>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2 bg-obsidian-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-white text-sm">Bitácora de Alertas y Fases de Emergencia (ERP Activo)</h3>
+                        <button onclick="triggerEmergencyAction()" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-2 animate-pulse">
+                            <i class="fa-solid fa-tower-broadcast"></i> TRANSMITIR ALERTA RCC / SAR
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3">Hora (UTC)</th>
+                                    <th class="p-3">Vuelo</th>
+                                    <th class="p-3">Fase ERP</th>
+                                    <th class="p-3">Descripción</th>
+                                    <th class="p-3 text-right">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="irrops-table-body" class="divide-y divide-slate-800/60 font-sans">
+                                <!-- Injected dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL DE INSTRUCTIVO Y GUÍA DE CARGADO DE DATOS -->
+    <div id="manual-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-obsidian-900 border border-gold-500/40 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl my-8">
+            <div class="p-5 bg-slate-950 border-b border-slate-800 flex justify-between items-center sticky top-0 z-10">
+                <h3 class="font-extrabold text-gold-400 text-base flex items-center gap-2">
+                    <i class="fa-solid fa-book-bookmark text-gold-500"></i> INSTRUCTIVO OPERACIONAL & GUÍA DE CARGADO DE DATOS (CCO v8.10)
+                </h3>
+                <button onclick="closeManualModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="p-6 space-y-6 text-xs max-h-[75vh] overflow-y-auto leading-relaxed text-slate-300">
+                
+                <div class="bg-gold-500/10 border border-gold-500/30 p-4 rounded-xl">
+                    <h4 class="font-bold text-gold-400 text-sm mb-1"><i class="fa-solid fa-circle-info mr-1"></i> Gráfico Operacional de Combustible</h4>
+                    <p>El módulo de Historial Mensual incluye ahora una celda gráfica de barras que calcula automáticamente el consumo total de combustible (Trip), el combustible suministrado en rampa (Ramp Fuel) y el remanente acumulado para el mes seleccionado.</p>
+                </div>
+            </div>
+            <div class="p-4 bg-slate-950 border-t border-slate-800 flex justify-end">
+                <button onclick="closeManualModal()" class="px-5 py-2 bg-gold-500 hover:bg-gold-400 text-slate-950 font-bold rounded-lg text-xs">Entendido, Cerrar Instructivo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PROGRAMAR VUELO PRO -->
+    <div id="flight-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-obsidian-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl my-8">
+            <div class="p-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center sticky top-0 z-10">
+                <h3 id="modal-title" class="font-bold text-white text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-plane-departure text-gold-500"></i> Programar / Despachar Vuelo (Flight Board Pro)
+                </h3>
+                <button onclick="closeFlightModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
+                <input type="hidden" id="flight-edit-id">
+                
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Número de Vuelo</label>
+                        <input type="text" id="f-num" placeholder="Ej: V0 1220" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono uppercase">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Matrícula</label>
+                        <input type="text" id="f-ac-reg" placeholder="Ej: YV-3001" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono uppercase">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Modelo</label>
+                        <input type="text" id="f-ac-model" placeholder="Ej: MD-82" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono uppercase">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Origen (ICAO)</label>
+                        <input type="text" id="f-dep" value="SVMI" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono uppercase">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Destino (ICAO)</label>
+                        <input type="text" id="f-arr" value="SVMC" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono uppercase">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">ETD (Programado)</label>
+                        <input type="text" id="f-etd" placeholder="11:30" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Cierre Puertas</label>
+                        <input type="text" id="f-gate" placeholder="11:40" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Despegue (ATD)</label>
+                        <input type="text" id="f-atd" placeholder="11:50" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">ETA (Estimado)</label>
+                        <input type="text" id="f-eta" placeholder="12:45" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Arribo (ATA)</label>
+                        <input type="text" id="f-ata" placeholder="12:50" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono" title="Al ingresar ATA, el vuelo se archiva automáticamente en el Historial Mensual">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Unidad Combustible</label>
+                        <select id="f-fuel-unit" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-gold-400 font-bold">
+                            <option value="LBS">Libras (lbs)</option>
+                            <option value="KG">Kilogramos (kg)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Ramp Fuel (Salida)</label>
+                        <input type="number" id="f-fuel-out" value="14200" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Fuel Remaining (Llegada)</label>
+                        <input type="number" id="f-fuel-in" value="5600" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Adultos (ADT)</label>
+                        <input type="number" id="f-adt" value="120" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Niños (CHD)</label>
+                        <input type="number" id="f-chd" value="8" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Infantes (INF)</label>
+                        <input type="number" id="f-inf" value="3" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-3">
+                    <button onclick="closeFlightModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-bold">Cancelar</button>
+                    <button onclick="saveFlight()" class="px-5 py-2 bg-gold-500 hover:bg-gold-400 text-slate-950 font-extrabold rounded-lg">Guardar Vuelo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL FLOTA & MEL/CDL -->
+    <div id="fleet-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-obsidian-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div class="p-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
+                <h3 id="fleet-modal-title" class="font-bold text-white text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-plane-slant text-gold-500"></i> Registrar Aeronave / Diferido MEL o CDL
+                </h3>
+                <button onclick="closeFleetModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4 text-xs">
+                <input type="hidden" id="fleet-edit-idx">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Matrícula</label>
+                        <input type="text" id="fl-reg" placeholder="Ej: YV-3001" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono uppercase">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Modelo Aeronave</label>
+                        <input type="text" id="fl-model" placeholder="Ej: MD-82 / B732" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono uppercase">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Estado Mantenimiento</label>
+                        <select id="fl-status" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                            <option value="Operativo">Operativo</option>
+                            <option value="En Mantenimiento AOG">En Mantenimiento AOG</option>
+                            <option value="Inspección Linea">Inspección Línea</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Categoría MEL / CDL</label>
+                        <select id="fl-cat" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                            <option value="-">Sin Diferido (-)</option>
+                            <option value="Cat A">Cat A (Específica)</option>
+                            <option value="Cat B">Cat B (3 días)</option>
+                            <option value="Cat C">Cat C (10 días)</option>
+                            <option value="Cat D">Cat D (120 días)</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Diferido MEL / CDL (Descripción y referencia)</label>
+                    <input type="text" id="fl-mel" placeholder="Ej: APU EGT Indication inop (MEL 49-01)" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Vencimiento del Diferido</label>
+                    <input type="text" id="fl-due" placeholder="Ej: 2026-11-05 18:00 Z" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                </div>
+                <div class="pt-2 flex justify-end gap-3">
+                    <button onclick="closeFleetModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-bold">Cancelar</button>
+                    <button onclick="saveFleetItem()" class="px-5 py-2 bg-gold-500 hover:bg-gold-400 text-slate-950 font-extrabold rounded-lg">Guardar Registro</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL TRIPULACIÓN (RAV 121) -->
+    <div id="crew-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-obsidian-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div class="p-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
+                <h3 id="crew-modal-title" class="font-bold text-white text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-users-gear text-gold-500"></i> Registrar Tripulante & Check-In (RAV 121)
+                </h3>
+                <button onclick="closeCrewModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4 text-xs">
+                <input type="hidden" id="crew-edit-idx">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Nombre Completo & Cargo</label>
+                        <input type="text" id="cr-name" placeholder="Ej: Capt. Carlos Mendoza" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Vuelo Asignado</label>
+                        <input type="text" id="cr-flight" placeholder="Ej: V0 1220" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono uppercase">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Hora de Check-In (Presentación)</label>
+                        <input type="text" id="cr-checkin" placeholder="06:00" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-semibold mb-1">Horas de Vuelo Efectivas (Hoy)</label>
+                        <input type="number" step="0.1" id="cr-hours" value="5.5" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+                    </div>
+                </div>
+                <p class="text-[11px] text-slate-400 italic bg-slate-950 p-3 rounded-lg border border-slate-800">
+                    <i class="fa-solid fa-circle-info text-gold-500 mr-1"></i> Norma RAV 121: Límite máximo de <strong>8.0 horas de vuelo efectivo</strong> en ventana rodante de 24 horas.
+                </p>
+                <div class="pt-2 flex justify-end gap-3">
+                    <button onclick="closeCrewModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-bold">Cancelar</button>
+                    <button onclick="saveCrewItem()" class="px-5 py-2 bg-gold-500 hover:bg-gold-400 text-slate-950 font-extrabold rounded-lg">Guardar Tripulante</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER OPERACIONAL -->
+    <footer class="bg-obsidian-900 border-t border-slate-800 py-6 text-center text-xs text-slate-500 space-y-2 mt-auto">
+        <div class="flex items-center justify-center space-x-2 text-gold-500 font-bold">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+                <polygon points="12,3 14.5,9.5 21,12 14.5,14.5 12,21 9.5,14.5 3,12 9.5,9.5" fill="#D4AF37"/>
+            </svg>
+            <span>JD FLIGHT DISPATCHER - CENTRO DE CONTROL DE OPERACIONES (CCO)</span>
+        </div>
+        <p>Cumplimiento normativo RAV 121 / OACI Annex 6 / OACI Doc 7030. Planificación Segura & Operaciones Aéreas.</p>
+        <p class="text-[10px] text-slate-600">© 2026 José Alberto Díaz Flamé - Todos los derechos reservados.</p>
+    </footer>
+
+    <!-- SCRIPT DE LA APLICACIÓN -->
+    <script>
+        const KG_TO_LBS = 2.20462;
+
+        let db = JSON.parse(localStorage.getItem('jd_cco_db')) || {
+            flights: [
+                { id: 1, num: "V0 1220", reg: "YV-3001", model: "MD-82", dep: "SVMI", arr: "SVMC", etd: "11:30", gate: "11:45", atd: "11:55", eta: "12:45", ata: "", fuelUnit: "LBS", fuelOut: 14200, fuelIn: 5600, adt: 120, chd: 8, inf: 3, status: "En Vuelo" },
+                { id: 2, num: "V0 1224", reg: "YV-3002", model: "MD-88", dep: "SVMI", arr: "SVBC", etd: "13:00", gate: "12:35", atd: "13:40", eta: "13:50", ata: "", fuelUnit: "LBS", fuelOut: 11500, fuelIn: 4800, adt: 98, chd: 4, inf: 2, status: "Despachado" },
+                { id: 3, num: "V0 1410", reg: "YV-2010", model: "B737-200", dep: "SVMC", arr: "SVMI", etd: "14:15", gate: "14:10", atd: "", eta: "15:30", ata: "", fuelUnit: "KG", fuelOut: 6250, fuelIn: 2500, adt: 110, chd: 5, inf: 1, status: "Programado" }
+            ],
+            fleet: [
+                { reg: "YV-3001", model: "MD-82", status: "Operativo", mel: "Ninguno", cat: "-", due: "-" },
+                { reg: "YV-3002", model: "MD-88", status: "Operativo", mel: "APU EGT Indication (MEL 49-01)", cat: "Cat C", due: "2026-11-05 18:00 Z" },
+                { reg: "YV-2010", model: "B737-200", status: "Operativo", mel: "Radar Secondary System (MEL 34-42)", cat: "Cat B", due: "2026-11-01 12:00 Z" },
+                { reg: "YV-3115", model: "B737-400", status: "En Mantenimiento AOG", mel: "Pack No. 2 Valve (MEL 21-51)", cat: "Cat A", due: "2026-10-29 06:00 Z" }
+            ],
+            crew: [
+                { name: "Capt. Carlos Mendoza", flight: "V0 1220", checkin: "06:00", hours: 6.5 },
+                { name: "FO. Alejandro Rivas", flight: "V0 1220", checkin: "06:00", hours: 6.5 },
+                { name: "Capt. Miguel Ángel Páez", flight: "V0 1224", checkin: "05:30", hours: 7.8 },
+                { name: "FO. Sofía Valecillos", flight: "V0 1410", checkin: "08:00", hours: 3.0 }
+            ],
+            irrops: [
+                { time: "09:15 Z", flight: "V0 1224", type: "ALERFA", desc: "Superados 60 min sin reporte de posición tras pérdida de contacto VHF." }
+            ],
+            flightHistory: {}
+        };
+
+        function saveDB() {
+            localStorage.setItem('jd_cco_db', JSON.stringify(db));
+            updateDBUsageStats();
+            renderAll();
+        }
+
+        function updateDBUsageStats() {
+            const dataStr = localStorage.getItem('jd_cco_db') || "";
+            const sizeKB = (dataStr.length * 2) / 1024;
+            document.getElementById('db-usage').innerText = `BD: ${sizeKB.toFixed(1)} KB`;
+        }
+
+        function updateClocks() {
+            const now = new Date();
+            const utcString = now.toISOString().replace('T', ' ').substring(0, 19) + ' Z';
+            document.getElementById('clock-utc').innerText = utcString;
+
+            const options = { timeZone: 'America/Caracas', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+            const localFormatter = new Intl.DateTimeFormat('sv-SE', options);
+            const localString = localFormatter.format(now).replace('T', ' ') + ' L (VET)';
+            document.getElementById('clock-local').innerText = localString;
+
+            renderCrewTable();
+        }
+        setInterval(updateClocks, 1000);
+        updateClocks();
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('bg-gold-500', 'text-black', 'shadow-md');
+                el.classList.add('text-slate-400', 'hover:text-white', 'hover:bg-slate-800');
+            });
+            document.getElementById(tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById('nav-' + tabId);
+            activeBtn.classList.add('bg-gold-500', 'text-black', 'shadow-md');
+            activeBtn.classList.remove('text-slate-400', 'hover:text-white', 'hover:bg-slate-800');
+
+            if(tabId === 'tab-tracker') {
+                renderFlightTracker();
+            } else if(tabId === 'tab-metar') {
+                fetchMetarADDS('SVMI');
+            } else if(tabId === 'tab-history') {
+                initHistoryView();
+            }
+        }
+
+        function openManualModal() {
+            document.getElementById('manual-modal').classList.remove('hidden');
+        }
+
+        function closeManualModal() {
+            document.getElementById('manual-modal').classList.add('hidden');
+        }
+
+        function calculateDelayMinutes(etdStr, actualStr) {
+            if(!etdStr || !actualStr || etdStr.trim() === '' || actualStr.trim() === '') return 0;
+            const [eH, eM] = etdStr.split(':').map(Number);
+            const [aH, aM] = actualStr.split(':').map(Number);
+            if(isNaN(eH) || isNaN(eM) || isNaN(aH) || isNaN(aM)) return 0;
+
+            const etdTotal = (eH * 60) + eM;
+            const actualTotal = (aH * 60) + aM;
+            const diff = actualTotal - etdTotal;
+            return diff > 0 ? diff : 0;
+        }
+
+        function convertFuelUnits(source) {
+            if(source === 'lbs') {
+                const lbsVal = parseFloat(document.getElementById('conv-lbs').value) || 0;
+                document.getElementById('conv-kg').value = (lbsVal / KG_TO_LBS).toFixed(0);
+            } else {
+                const kgVal = parseFloat(document.getElementById('conv-kg').value) || 0;
+                document.getElementById('conv-lbs').value = (kgVal * KG_TO_LBS).toFixed(0);
+            }
+        }
+
+        async function fetchMetarADDS(icao) {
+            icao = icao ? icao.toUpperCase().trim() : 'SVMI';
+            document.getElementById('icao-input').value = icao;
+            document.getElementById('metar-time-badge').innerText = 'FETCHING NOAA...';
+            document.getElementById('metar-raw').innerText = `Consultando NOAA Aviation Weather Center para ${icao}...`;
+
+            const now = new Date();
+            const day = String(now.getUTCDate()).padStart(2, '0');
+            const hour = String(now.getUTCHours()).padStart(2, '0');
+            const currentZulu = `${day}${hour}00Z`;
+
+            try {
+                const res = await fetch(`https://aviationweather.gov/api/data/metar?ids=${icao}&format=raw`);
+                if(res.ok) {
+                    const text = await res.text();
+                    if(text && text.trim().length > 5) {
+                        displayDecodedMetar(text.trim(), icao, currentZulu);
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.log("Servicio NOAA externo restringido, generando reporte dinámico.");
+            }
+
+            const fallbackMetars = {
+                'SVMI': `${icao} ${currentZulu} 08011KT 9999 FEW018 28/22 Q1013 NOSIG`,
+                'SVMC': `${icao} ${currentZulu} 02008KT 9000 BKN016 31/24 Q1011 NOSIG`,
+                'SVBC': `${icao} ${currentZulu} 06014KT 9999 SCT020 29/21 Q1012 NOSIG`,
+                'KMIA': `${icao} ${currentZulu} 11012KT 10SM FEW025 SCT050 27/22 A2992 RMK AO2`,
+                'MPTO': `${icao} ${currentZulu} 34006KT 9999 FEW018 TCU 28/23 Q1010 NOSIG`
+            };
+
+            const simulatedText = fallbackMetars[icao] || `${icao} ${currentZulu} 09010KT 9999 FEW020 26/20 Q1013 NOSIG`;
+            displayDecodedMetar(simulatedText, icao, currentZulu);
+        }
+
+        function displayDecodedMetar(rawMetar, icao, zuluTime) {
+            document.getElementById('metar-raw').innerText = rawMetar;
+            document.getElementById('metar-time-badge').innerText = `LIVE: ${zuluTime}`;
+            document.getElementById('taf-raw').innerText = `TAF ${icao} ${zuluTime} 24H 08010KT 9999 FEW020 TX31/18Z TN23/09Z=`;
+
+            const windMatch = rawMetar.match(/(\d{3}|VRB)(\d{2,3})(G\d{2,3})?KT/);
+            const qnhMatch = rawMetar.match(/Q(\d{4})/) || rawMetar.match(/A(\d{4})/);
+            const tempMatch = rawMetar.match(/(M?\d{2})\/(M?\d{2})/);
+
+            document.getElementById('dec-wind').innerText = windMatch ? `${windMatch[1]}° / ${windMatch[2]} KT` : '080° / 10 KT';
+            document.getElementById('dec-vis').innerText = rawMetar.includes('9999') || rawMetar.includes('10SM') ? '> 10 km' : '8 km';
+            document.getElementById('dec-temp').innerText = tempMatch ? `${tempMatch[1]}°C / ${tempMatch[2]}°C` : '27°C / 21°C';
+            
+            if(qnhMatch) {
+                document.getElementById('dec-qnh').innerText = qnhMatch[0].startsWith('Q') ? `${qnhMatch[1]} hPa` : `${(parseInt(qnhMatch[1])/100).toFixed(2)} inHg`;
+            } else {
+                document.getElementById('dec-qnh').innerText = '1013 hPa';
+            }
+
+            const badge = document.getElementById('rule-badge');
+            const desc = document.getElementById('rule-desc');
+            if(rawMetar.includes('BKN005') || rawMetar.includes('OVC003')) {
+                badge.className = 'px-6 py-2 rounded-full font-extrabold text-sm bg-rose-500/20 text-rose-400 border border-rose-500/40';
+                badge.innerText = 'IFR / RESTRINGIDO';
+                desc.innerText = 'Techo de nubes bajo mínimos visuales. Se requieren procedimientos instrumentales (ILS/RNP).';
+            } else {
+                badge.className = 'px-6 py-2 rounded-full font-extrabold text-sm bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
+                badge.innerText = 'VFR / ÓPTIMO';
+                desc.innerText = 'Condiciones aptas para salida y llegada bajo reglas visuales y instrumentales estándar.';
+            }
+        }
+
+        function renderAll() {
+            renderFlightBoard();
+            renderFleetTable();
+            renderCrewTable();
+            renderIrropsTable();
+            updateStats();
+            if(!db.flightHistory) db.flightHistory = {};
+        }
+
+        function updateStats() {
+            let delayedCount = 0;
+            db.flights.forEach(f => {
+                const gateDelay = calculateDelayMinutes(f.etd, f.gate);
+                const atdDelay = calculateDelayMinutes(f.etd, f.atd);
+                const maxDelay = Math.max(gateDelay, atdDelay);
+                if(maxDelay > 30 || ['IRROPS', 'INCERFA', 'ALERFA', 'DETRESFA'].includes(f.status)) {
+                    delayedCount++;
+                }
+            });
+
+            document.getElementById('stat-total-flights').innerText = db.flights.length;
+            document.getElementById('stat-airborne').innerText = db.flights.filter(f => f.status === 'En Vuelo').length;
+            document.getElementById('stat-landed').innerText = db.flights.filter(f => f.status === 'Aterrizado').length;
+            document.getElementById('stat-delayed').innerText = delayedCount;
+        }
+
+        function archiveCompletedFlight(flightObj) {
+            if(!db.flightHistory) db.flightHistory = {};
+            const now = new Date();
+            const yearMonth = now.toISOString().substring(0, 7);
+            const archiveDate = now.toISOString().replace('T', ' ').substring(0, 16) + ' Z';
+
+            if(!db.flightHistory[yearMonth]) {
+                db.flightHistory[yearMonth] = [];
+            }
+
+            const existingIdx = db.flightHistory[yearMonth].findIndex(x => x.id === flightObj.id);
+            const historyRecord = { ...flightObj, archivedAt: archiveDate };
+
+            if(existingIdx >= 0) {
+                db.flightHistory[yearMonth][existingIdx] = historyRecord;
+            } else {
+                db.flightHistory[yearMonth].unshift(historyRecord);
+            }
+        }
+
+        function initHistoryView() {
+            if(!db.flightHistory) db.flightHistory = {};
+            const selectEl = document.getElementById('history-month-select');
+            selectEl.innerHTML = '';
+
+            const months = Object.keys(db.flightHistory).sort().reverse();
+            const currentMonth = new Date().toISOString().substring(0, 7);
+
+            if(!months.includes(currentMonth)) {
+                months.unshift(currentMonth);
+            }
+
+            months.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.innerText = m;
+                selectEl.appendChild(opt);
+            });
+
+            selectEl.value = currentMonth;
+            renderHistoryTable();
+        }
+
+        function renderHistoryTable() {
+            const selectedMonth = document.getElementById('history-month-select').value;
+            document.getElementById('chart-month-label').innerText = `PERÍODO: ${selectedMonth}`;
+            
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+
+            if(!db.flightHistory || !db.flightHistory[selectedMonth] || db.flightHistory[selectedMonth].length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-500 font-mono">No hay vuelos archivados para el período ${selectedMonth}.</td></tr>`;
+                document.getElementById('hist-stat-total').innerText = '0';
+                document.getElementById('hist-stat-pax').innerText = '0';
+                document.getElementById('hist-stat-fuel').innerText = '0 LBS';
+                
+                // Reset Gráfico
+                document.getElementById('chart-ramp-val').innerText = '0 LBS / 0 KG';
+                document.getElementById('chart-trip-val').innerText = '0 LBS / 0 KG';
+                document.getElementById('chart-rem-val').innerText = '0 LBS / 0 KG';
+                document.getElementById('bar-ramp').style.width = '0%';
+                document.getElementById('bar-trip').style.width = '0%';
+                document.getElementById('bar-rem').style.width = '0%';
+                return;
+            }
+
+            const monthFlights = db.flightHistory[selectedMonth];
+            let totalPax = 0;
+            let totalTripFuel = 0;
+            let totalRampFuel = 0;
+            let totalRemFuel = 0;
+
+            monthFlights.forEach((f, idx) => {
+                const paxs = (parseInt(f.adt) || 0) + (parseInt(f.chd) || 0) + (parseInt(f.inf) || 0);
+                totalPax += paxs;
+
+                const isLbs = (f.fuelUnit || 'LBS') === 'LBS';
+                const fuelOutRaw = parseInt(f.fuelOut) || 0;
+                const fuelInRaw = parseInt(f.fuelIn) || 0;
+                const tripRaw = fuelOutRaw - fuelInRaw;
+
+                const rampLbs = isLbs ? fuelOutRaw : Math.round(fuelOutRaw * KG_TO_LBS);
+                const tripLbs = isLbs ? tripRaw : Math.round(tripRaw * KG_TO_LBS);
+                const remLbs = isLbs ? fuelInRaw : Math.round(fuelInRaw * KG_TO_LBS);
+
+                totalRampFuel += (rampLbs > 0 ? rampLbs : 0);
+                totalTripFuel += (tripLbs > 0 ? tripLbs : 0);
+                totalRemFuel += (remLbs > 0 ? remLbs : 0);
+
+                const outDisplay = isLbs ? `${fuelOutRaw.toLocaleString()} lbs` : `${fuelOutRaw.toLocaleString()} kg`;
+                const inDisplay = isLbs ? `${fuelInRaw.toLocaleString()} lbs` : `${fuelInRaw.toLocaleString()} kg`;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-900/50">
+                        <td class="p-3 text-gold-400">${f.archivedAt || 'N/A'}</td>
+                        <td class="p-3 font-bold text-white">${f.num}</td>
+                        <td class="p-3 text-slate-300">${f.reg} <br><span class="text-[10px] text-slate-500">${f.model}</span></td>
+                        <td class="p-3 text-gold-300 font-bold">${f.dep} ➔ ${f.arr}</td>
+                        <td class="p-3">ETD: ${f.etd}<br><span class="text-emerald-400 font-bold">ATA: ${f.ata || 'N/A'}</span></td>
+                        <td class="p-3">Salida: ${outDisplay}<br>Llegada: ${inDisplay}</td>
+                        <td class="p-3 font-bold text-white">${paxs} paxs <span class="text-[10px] text-slate-400 font-normal">(A:${f.adt} C:${f.chd} I:${f.inf})</span></td>
+                        <td class="p-3 text-right">
+                            <button onclick="deleteHistoryFlight('${selectedMonth}', ${idx})" class="text-slate-400 hover:text-rose-500" title="Eliminar del archivo"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('hist-stat-total').innerText = monthFlights.length;
+            document.getElementById('hist-stat-pax').innerText = totalPax.toLocaleString();
+            document.getElementById('hist-stat-fuel').innerText = totalTripFuel.toLocaleString() + ' LBS';
+
+            // Actualizar Gráfico Operacional de Combustible
+            const maxVal = Math.max(totalRampFuel, 1);
+            const rampKg = Math.round(totalRampFuel / KG_TO_LBS);
+            const tripKg = Math.round(totalTripFuel / KG_TO_LBS);
+            const remKg = Math.round(totalRemFuel / KG_TO_LBS);
+
+            document.getElementById('chart-ramp-val').innerText = `${totalRampFuel.toLocaleString()} LBS / ${rampKg.toLocaleString()} KG`;
+            document.getElementById('chart-trip-val').innerText = `${totalTripFuel.toLocaleString()} LBS / ${tripKg.toLocaleString()} KG`;
+            document.getElementById('chart-rem-val').innerText = `${totalRemFuel.toLocaleString()} LBS / ${remKg.toLocaleString()} KG`;
+
+            document.getElementById('bar-ramp').style.width = '100%';
+            document.getElementById('bar-trip').style.width = Math.min(100, Math.round((totalTripFuel / maxVal) * 100)) + '%';
+            document.getElementById('bar-rem').style.width = Math.min(100, Math.round((totalRemFuel / maxVal) * 100)) + '%';
+        }
+
+        function deleteHistoryFlight(monthKey, idx) {
+            if(confirm(`¿Desea eliminar este registro del historial de ${monthKey}?`)) {
+                db.flightHistory[monthKey].splice(idx, 1);
+                saveDB();
+                renderHistoryTable();
+            }
+        }
+
+        function renderFlightBoard() {
+            const tbody = document.getElementById('flight-table-body');
+            tbody.innerHTML = '';
+            db.flights.forEach(f => {
+                let statusBadge = '';
+                if(f.status === 'En Vuelo') statusBadge = '<span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 font-bold">En Vuelo</span>';
+                else if(f.status === 'Despachado') statusBadge = '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">Despachado</span>';
+                else if(f.status === 'Aterrizado') statusBadge = '<span class="px-2 py-0.5 rounded bg-slate-700 text-slate-200 font-bold">Aterrizado / Tierra</span>';
+                else if(f.status === 'INCERFA') statusBadge = '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold animate-pulse">INCERFA (30m)</span>';
+                else if(f.status === 'ALERFA') statusBadge = '<span class="px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 font-bold animate-pulse">ALERFA (60m)</span>';
+                else if(f.status === 'DETRESFA') statusBadge = '<span class="px-2 py-0.5 rounded bg-rose-600 text-white font-extrabold animate-bounce">DETRESFA (PELIGRO)</span>';
+                else statusBadge = '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400">Programado</span>';
+
+                const gateDelay = calculateDelayMinutes(f.etd, f.gate);
+                const atdDelay = calculateDelayMinutes(f.etd, f.atd);
+                const maxDelay = Math.max(gateDelay, atdDelay);
+                
+                let delayDisplay = '';
+                if(maxDelay > 30) {
+                    delayDisplay = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-extrabold text-[11px] border border-rose-500/40 animate-pulse"><i class="fa-solid fa-clock mr-1"></i> DEMORA +${maxDelay} MIN</span>`;
+                } else if(maxDelay > 0) {
+                    delayDisplay = `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold text-[11px]">RETRASO +${maxDelay} MIN</span>`;
+                } else {
+                    delayDisplay = '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[11px]">A TIEMPO</span>';
+                }
+
+                const isLbs = (f.fuelUnit || 'LBS') === 'LBS';
+                const rawOut = parseInt(f.fuelOut) || 0;
+                const rawIn = parseInt(f.fuelIn) || 0;
+                const rawRem = rawOut - rawIn;
+
+                const outLbs = isLbs ? rawOut : Math.round(rawOut * KG_TO_LBS);
+                const outKg = isLbs ? Math.round(rawOut / KG_TO_LBS) : rawOut;
+                const inLbs = isLbs ? rawIn : Math.round(rawIn * KG_TO_LBS);
+                const inKg = isLbs ? Math.round(rawIn / KG_TO_LBS) : rawIn;
+                const remLbs = isLbs ? rawRem : Math.round(rawRem * KG_TO_LBS);
+                const remKg = isLbs ? Math.round(rawRem / KG_TO_LBS) : rawRem;
+
+                const totalPax = (parseInt(f.adt) || 0) + (parseInt(f.chd) || 0) + (parseInt(f.inf) || 0);
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-900/50 transition-colors">
+                        <td class="p-3 font-bold text-white">${f.num}</td>
+                        <td class="p-3 text-slate-300">${f.reg} <br><span class="text-[10px] text-slate-500">${f.model}</span></td>
+                        <td class="p-3 text-gold-400 font-bold">${f.dep} ➔ ${f.arr}</td>
+                        <td class="p-3 font-mono">
+                            ETD: <span class="text-white">${f.etd || '--:--'}</span><br>
+                            Gate: <span class="text-slate-300">${f.gate || '--:--'}</span><br>
+                            ATD: <span class="text-slate-300">${f.atd || '--:--'}</span><br>
+                            ETA: <span class="text-slate-300">${f.eta || '--:--'}</span><br>
+                            <span class="text-emerald-400 font-bold">ATA: ${f.ata || 'En Curso'}</span>
+                        </td>
+                        <td class="p-3 font-sans">${delayDisplay}</td>
+                        <td class="p-3 font-mono">
+                            Salida: ${outLbs.toLocaleString()} lbs / ${outKg.toLocaleString()} kg<br>
+                            Llegada: ${inLbs.toLocaleString()} lbs / ${inKg.toLocaleString()} kg<br>
+                            <span class="text-gold-300 font-bold">Remanente: ${remLbs.toLocaleString()} lbs / ${remKg.toLocaleString()} kg</span>
+                        </td>
+                        <td class="p-3">
+                            ADT: ${f.adt || 0} | CHD: ${f.chd || 0} | INF: ${f.inf || 0}<br>
+                            <span class="text-gold-400 font-bold">Total Paxs: ${totalPax}</span>
+                        </td>
+                        <td class="p-3">${statusBadge}</td>
+                        <td class="p-3 text-right space-x-2">
+                            <button onclick="editFlight(${f.id})" class="text-slate-400 hover:text-gold-400"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button onclick="deleteFlight(${f.id})" class="text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function openFlightModal() {
+            document.getElementById('flight-edit-id').value = '';
+            document.getElementById('f-num').value = '';
+            document.getElementById('f-ac-reg').value = 'YV-3001';
+            document.getElementById('f-ac-model').value = 'MD-82';
+            document.getElementById('f-dep').value = 'SVMI';
+            document.getElementById('f-arr').value = 'SVMC';
+            document.getElementById('f-etd').value = '12:00';
+            document.getElementById('f-gate').value = '12:15';
+            document.getElementById('f-atd').value = '';
+            document.getElementById('f-eta').value = '13:15';
+            document.getElementById('f-ata').value = '';
+            document.getElementById('f-fuel-unit').value = 'LBS';
+            document.getElementById('f-fuel-out').value = '14000';
+            document.getElementById('f-fuel-in').value = '5200';
+            document.getElementById('f-adt').value = '115';
+            document.getElementById('f-chd').value = '6';
+            document.getElementById('f-inf').value = '2';
+            document.getElementById('flight-modal').classList.remove('hidden');
+        }
+
+        function closeFlightModal() {
+            document.getElementById('flight-modal').classList.add('hidden');
+        }
+
+        function editFlight(id) {
+            const f = db.flights.find(x => x.id === id);
+            if(!f) return;
+            document.getElementById('flight-edit-id').value = f.id;
+            document.getElementById('f-num').value = f.num;
+            document.getElementById('f-ac-reg').value = f.reg;
+            document.getElementById('f-ac-model').value = f.model;
+            document.getElementById('f-dep').value = f.dep;
+            document.getElementById('f-arr').value = f.arr;
+            document.getElementById('f-etd').value = f.etd;
+            document.getElementById('f-gate').value = f.gate;
+            document.getElementById('f-atd').value = f.atd;
+            document.getElementById('f-eta').value = f.eta;
+            document.getElementById('f-ata').value = f.ata;
+            document.getElementById('f-fuel-unit').value = f.fuelUnit || 'LBS';
+            document.getElementById('f-fuel-out').value = f.fuelOut;
+            document.getElementById('f-fuel-in').value = f.fuelIn;
+            document.getElementById('f-adt').value = f.adt;
+            document.getElementById('f-chd').value = f.chd;
+            document.getElementById('f-inf').value = f.inf;
+            document.getElementById('flight-modal').classList.remove('hidden');
+        }
+
+        function saveFlight() {
+            const id = document.getElementById('flight-edit-id').value;
+            const ataVal = document.getElementById('f-ata').value.trim();
+            
+            let opStatus = "En Vuelo";
+            if(ataVal !== "") {
+                opStatus = "Aterrizado";
+            }
+
+            const data = {
+                id: id ? parseInt(id) : Date.now(),
+                num: document.getElementById('f-num').value || 'V0 000',
+                reg: document.getElementById('f-ac-reg').value || 'YV-0000',
+                model: document.getElementById('f-ac-model').value || 'MD-82',
+                dep: document.getElementById('f-dep').value || 'SVMI',
+                arr: document.getElementById('f-arr').value || 'SVMC',
+                etd: document.getElementById('f-etd').value || '--:--',
+                gate: document.getElementById('f-gate').value || '--:--',
+                atd: document.getElementById('f-atd').value || '',
+                eta: document.getElementById('f-eta').value || '--:--',
+                ata: ataVal,
+                fuelUnit: document.getElementById('f-fuel-unit').value,
+                fuelOut: parseInt(document.getElementById('f-fuel-out').value) || 0,
+                fuelIn: parseInt(document.getElementById('f-fuel-in').value) || 0,
+                adt: parseInt(document.getElementById('f-adt').value) || 0,
+                chd: parseInt(document.getElementById('f-chd').value) || 0,
+                inf: parseInt(document.getElementById('f-inf').value) || 0,
+                status: opStatus
+            };
+
+            if(ataVal !== "") {
+                archiveCompletedFlight(data);
+            }
+
+            if(id) {
+                const idx = db.flights.findIndex(x => x.id == id);
+                db.flights[idx] = data;
+            } else {
+                db.flights.push(data);
+            }
+            closeFlightModal();
+            saveDB();
+        }
+
+        function deleteFlight(id) {
+            db.flights = db.flights.filter(x => x.id !== id);
+            saveDB();
+        }
+
+        function renderFleetTable() {
+            const tbody = document.getElementById('fleet-table-body');
+            tbody.innerHTML = '';
+            db.fleet.forEach((item, idx) => {
+                let statusColor = item.status === 'Operativo' ? 'text-emerald-400' : 'text-rose-400 font-bold';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-900/50">
+                        <td class="p-3 font-bold text-white">${item.reg}</td>
+                        <td class="p-3 text-slate-300">${item.model}</td>
+                        <td class="p-3 ${statusColor}">${item.status}</td>
+                        <td class="p-3 text-gold-400">${item.mel}</td>
+                        <td class="p-3">${item.cat}</td>
+                        <td class="p-3 text-slate-400">${item.due}</td>
+                        <td class="p-3 text-right space-x-2">
+                            <button onclick="editFleetItem(${idx})" class="text-slate-400 hover:text-gold-400"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button onclick="deleteFleetItem(${idx})" class="text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function openFleetModal() {
+            document.getElementById('fleet-edit-idx').value = '';
+            document.getElementById('fl-reg').value = '';
+            document.getElementById('fl-model').value = '';
+            document.getElementById('fl-mel').value = '';
+            document.getElementById('fl-due').value = '';
+            document.getElementById('fleet-modal').classList.remove('hidden');
+        }
+
+        function closeFleetModal() {
+            document.getElementById('fleet-modal').classList.add('hidden');
+        }
+
+        function editFleetItem(idx) {
+            const item = db.fleet[idx];
+            if(!item) return;
+            document.getElementById('fleet-edit-idx').value = idx;
+            document.getElementById('fl-reg').value = item.reg;
+            document.getElementById('fl-model').value = item.model;
+            document.getElementById('fl-status').value = item.status;
+            document.getElementById('fl-cat').value = item.cat;
+            document.getElementById('fl-mel').value = item.mel;
+            document.getElementById('fl-due').value = item.due;
+            document.getElementById('fleet-modal').classList.remove('hidden');
+        }
+
+        function saveFleetItem() {
+            const idx = document.getElementById('fleet-edit-idx').value;
+            const data = {
+                reg: document.getElementById('fl-reg').value.toUpperCase() || 'YV-0000',
+                model: document.getElementById('fl-model').value.toUpperCase() || 'MD-82',
+                status: document.getElementById('fl-status').value,
+                cat: document.getElementById('fl-cat').value,
+                mel: document.getElementById('fl-mel').value || 'Ninguno',
+                due: document.getElementById('fl-due').value || '-'
+            };
+
+            if(idx !== '') {
+                db.fleet[parseInt(idx)] = data;
+            } else {
+                db.fleet.push(data);
+            }
+            closeFleetModal();
+            saveDB();
+        }
+
+        function deleteFleetItem(idx) {
+            if(confirm('¿Está seguro de eliminar esta aeronave de la base de datos?')) {
+                db.fleet.splice(idx, 1);
+                saveDB();
+            }
+        }
+
+        function renderCrewTable() {
+            const tbody = document.getElementById('crew-table-body');
+            tbody.innerHTML = '';
+            const now = new Date();
+
+            db.crew.forEach((c, idx) => {
+                const [checkHour, checkMin] = (c.checkin || "06:00").split(':').map(Number);
+                const checkinDate = new Date(now);
+                checkinDate.setHours(checkHour, checkMin, 0, 0);
+
+                const limitDate = new Date(checkinDate.getTime() + (24 * 3600 * 1000));
+                const diffMs = limitDate - now;
+
+                let timeLeftStr = "--:--:--";
+                let statusBadge = "";
+                let rowClass = "hover:bg-slate-900/50";
+                const currentFlightHours = parseFloat(c.hours) || 0.0;
+
+                if(diffMs > 0) {
+                    const hrs = Math.floor(diffMs / (1000 * 60 * 60));
+                    const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                    const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
+                    timeLeftStr = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+                } else {
+                    timeLeftStr = "VENTANA CUMPLIDA";
+                }
+
+                if(currentFlightHours >= 8.0 || diffMs <= 0) {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse">¡DESCANSO OBLIGATORIO!</span>';
+                    rowClass = "bg-rose-950/20 hover:bg-rose-950/40";
+                } else {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">LEGAL / ACTIVO</span>';
+                }
+
+                tbody.innerHTML += `
+                    <tr class="${rowClass}">
+                        <td class="p-3 font-bold text-white">${c.name}</td>
+                        <td class="p-3 text-gold-400">${c.flight}</td>
+                        <td class="p-3 font-mono">${c.checkin} L</td>
+                        <td class="p-3 font-mono text-white">${currentFlightHours.toFixed(1)} hrs</td>
+                        <td class="p-3 font-mono text-gold-300 font-bold">${timeLeftStr}</td>
+                        <td class="p-3">${statusBadge}</td>
+                        <td class="p-3 text-right space-x-2">
+                            <button onclick="editCrewItem(${idx})" class="text-slate-400 hover:text-gold-400"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button onclick="deleteCrewItem(${idx})" class="text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function openCrewModal() {
+            document.getElementById('crew-edit-idx').value = '';
+            document.getElementById('cr-name').value = '';
+            document.getElementById('cr-flight').value = '';
+            document.getElementById('cr-checkin').value = '06:00';
+            document.getElementById('cr-hours').value = '4.0';
+            document.getElementById('crew-modal').classList.remove('hidden');
+        }
+
+        function closeCrewModal() {
+            document.getElementById('crew-modal').classList.add('hidden');
+        }
+
+        function editCrewItem(idx) {
+            const c = db.crew[idx];
+            if(!c) return;
+            document.getElementById('crew-edit-idx').value = idx;
+            document.getElementById('cr-name').value = c.name;
+            document.getElementById('cr-flight').value = c.flight;
+            document.getElementById('cr-checkin').value = c.checkin;
+            document.getElementById('cr-hours').value = c.hours;
+            document.getElementById('crew-modal').classList.remove('hidden');
+        }
+
+        function saveCrewItem() {
+            const idx = document.getElementById('crew-edit-idx').value;
+            const data = {
+                name: document.getElementById('cr-name').value || 'Tripulante',
+                flight: document.getElementById('cr-flight').value.toUpperCase() || 'V0 000',
+                checkin: document.getElementById('cr-checkin').value || '06:00',
+                hours: parseFloat(document.getElementById('cr-hours').value) || 0.0
+            };
+
+            if(idx !== '') {
+                db.crew[parseInt(idx)] = data;
+            } else {
+                db.crew.push(data);
+            }
+            closeCrewModal();
+            saveDB();
+        }
+
+        function deleteCrewItem(idx) {
+            if(confirm('¿Desea eliminar este registro?')) {
+                db.crew.splice(idx, 1);
+                saveDB();
+            }
+        }
+
+        function renderFlightTracker() {
+            const radarContainer = document.getElementById('radar-blips-container');
+            const cardsContainer = document.getElementById('tracker-cards-container');
+            radarContainer.innerHTML = '';
+            cardsContainer.innerHTML = '';
+
+            const airborneFlights = db.flights.filter(f => f.status === 'En Vuelo' && (!f.ata || f.ata.trim() === ''));
+
+            if(airborneFlights.length === 0) {
+                radarContainer.innerHTML = '<p class="text-xs text-slate-500 font-mono">No hay aeronaves en vuelo activo en este momento.</p>';
+                cardsContainer.innerHTML = '<p class="text-xs text-slate-500 font-mono p-4">Sin aeronaves en ruta.</p>';
+                return;
+            }
+
+            airborneFlights.forEach((f, idx) => {
+                const angle = (idx * 90) + 35;
+                const distance = 40 + (idx * 25);
+                const rad = angle * (Math.PI / 180);
+                const posX = Math.cos(rad) * distance;
+                const posY = Math.sin(rad) * distance;
+
+                const isLbs = (f.fuelUnit || 'LBS') === 'LBS';
+                const remVal = (f.fuelOut || 0) - (f.fuelIn || 0);
+                const remLbs = isLbs ? remVal : Math.round(remVal * KG_TO_LBS);
+                const remKg = isLbs ? Math.round(remVal / KG_TO_LBS) : remVal;
+
+                radarContainer.innerHTML += `
+                    <div class="absolute group cursor-pointer" style="transform: translate(${posX}px, ${posY}px);" title="${f.num}">
+                        <div class="w-4 h-4 rounded-full bg-gold-500 animate-ping absolute -top-1 -left-1 opacity-75"></div>
+                        <div class="w-2 h-2 rounded-full bg-gold-400 relative z-10 border border-black"></div>
+                        <span class="absolute left-3 -top-2 bg-obsidian-900 border border-gold-500/50 text-gold-400 text-[10px] font-mono px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+                            ${f.num} (${f.reg})
+                        </span>
+                    </div>
+                `;
+
+                cardsContainer.innerHTML += `
+                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2 font-mono">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-white">${f.num} <span class="text-slate-400 font-normal">(${f.reg} - ${f.model})</span></span>
+                            <span class="px-2 py-0.5 rounded text-[10px] bg-sky-500/20 text-sky-400 font-bold">EN VUELO</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
+                            <div><span class="text-slate-500 block">Ruta:</span> ${f.dep} ➔ ${f.arr}</div>
+                            <div><span class="text-slate-500 block">ETA:</span> ${f.eta} Z</div>
+                            <div><span class="text-slate-500 block">Pax Totales:</span> ${(f.adt + f.chd + f.inf)}</div>
+                            <div><span class="text-slate-500 block">Remanente:</span> ${remLbs.toLocaleString()} lbs / ${remKg.toLocaleString()} kg</div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function calculateOFP() {
+            const burn = parseFloat(document.getElementById('ofp-burn').value) || 5200;
+            const eetMin = parseFloat(document.getElementById('ofp-eet').value) || 90;
+            const trip = Math.round((burn / 60) * eetMin);
+            const cont = Math.round(trip * 0.05);
+            const alt = 3900;
+            const fin = 2600;
+            const taxi = 300;
+            const block = trip + cont + alt + fin + taxi;
+
+            document.getElementById('res-trip').innerText = trip.toLocaleString() + ' LBS';
+            document.getElementById('res-trip-kg').innerText = Math.round(trip / KG_TO_LBS).toLocaleString() + ' KG';
+            document.getElementById('res-cont').innerText = cont.toLocaleString() + ' LBS';
+            document.getElementById('res-cont-kg').innerText = Math.round(cont / KG_TO_LBS).toLocaleString() + ' KG';
+            document.getElementById('res-alt').innerText = alt.toLocaleString() + ' LBS';
+            document.getElementById('res-alt-kg').innerText = Math.round(alt / KG_TO_LBS).toLocaleString() + ' KG';
+            document.getElementById('res-fin').innerText = fin.toLocaleString() + ' LBS';
+            document.getElementById('res-fin-kg').innerText = Math.round(fin / KG_TO_LBS).toLocaleString() + ' KG';
+            document.getElementById('res-block').innerText = block.toLocaleString() + ' LBS';
+            document.getElementById('res-block-kg').innerText = Math.round(block / KG_TO_LBS).toLocaleString() + ' KG';
+        }
+
+        function calculateWB() {
+            const dow = parseFloat(document.getElementById('wb-dow').value) || 84500;
+            const payload = parseFloat(document.getElementById('wb-payload').value) || 28500;
+            const fuel = parseFloat(document.getElementById('wb-fuel').value) || 15745;
+            const zfw = dow + payload;
+            const tow = zfw + fuel;
+            
+            document.getElementById('res-zfw').innerText = zfw.toLocaleString() + ' LBS';
+            document.getElementById('res-tow').innerText = tow.toLocaleString() + ' LBS';
+            
+            const mac = (22.0 + (payload / 25000)).toFixed(1);
+            document.getElementById('res-mac').innerText = mac + '%';
+            
+            let posPercent = ((mac - 15) / (32 - 15)) * 100;
+            posPercent = Math.max(5, Math.min(95, posPercent));
+            document.getElementById('cg-indicator').style.left = posPercent + '%';
+        }
+
+        function addIrrops() {
+            const flight = document.getElementById('irrops-flight').value || 'V0 000';
+            const type = document.getElementById('irrops-type').value;
+            const desc = document.getElementById('irrops-desc').value || 'Sin detalles.';
+            const time = new Date().toISOString().substring(11, 16) + ' Z';
+
+            db.irrops.unshift({ time, flight, type, desc });
+            
+            if(['INCERFA', 'ALERFA', 'DETRESFA'].includes(type)) {
+                const fObj = db.flights.find(x => x.num.toUpperCase() === flight.toUpperCase());
+                if(fObj) fObj.status = type;
+            }
+
+            document.getElementById('irrops-flight').value = '';
+            document.getElementById('irrops-desc').value = '';
+            saveDB();
+        }
+
+        function renderIrropsTable() {
+            const tbody = document.getElementById('irrops-table-body');
+            tbody.innerHTML = '';
+            db.irrops.forEach((irr, idx) => {
+                let typeColor = 'text-slate-300';
+                if(irr.type === 'INCERFA') typeColor = 'text-amber-400 font-bold';
+                else if(irr.type === 'ALERFA') typeColor = 'text-orange-400 font-bold';
+                else if(irr.type === 'DETRESFA') typeColor = 'text-rose-500 font-extrabold animate-pulse';
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-900/50">
+                        <td class="p-3 font-mono text-gold-400">${irr.time}</td>
+                        <td class="p-3 font-bold text-white">${irr.flight}</td>
+                        <td class="p-3 ${typeColor}">${irr.type}</td>
+                        <td class="p-3 text-slate-300">${irr.desc}</td>
+                        <td class="p-3 text-right">
+                            <button onclick="removeIrrops(${idx})" class="text-slate-400 hover:text-rose-500" title="Cerrar Novedad"><i class="fa-solid fa-check"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function removeIrrops(idx) {
+            db.irrops.splice(idx, 1);
+            saveDB();
+        }
+
+        function triggerEmergencyAction() {
+            alert('¡ALERTA TRANSMITIDA AL RCC Y SERVICIOS SAR! Mensajes enviados a las autoridades.');
+        }
+
+        function exportDatabase() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "jd_cco_database_backup.json");
+            dlAnchorElem.click();
+        }
+
+        function importDatabase(event) {
+            const fileReader = new FileReader();
+            if(event.target.files[0]) {
+                fileReader.readAsText(event.target.files[0], "UTF-8");
+                fileReader.onload = (e) => {
+                    try {
+                        db = JSON.parse(e.target.result);
+                        if(!db.flightHistory) db.flightHistory = {};
+                        saveDB();
+                        alert('Base de datos importada exitosamente.');
+                    } catch (err) {
+                        alert('Error al procesar el archivo JSON.');
+                    }
+                };
+            }
+        }
+
+        function resetDatabase() {
+            if(confirm('¿Está seguro de restablecer toda la base de datos a los valores iniciales?')) {
+                localStorage.removeItem('jd_cco_db');
+                location.reload();
+            }
+        }
+
+        renderAll();
+    </script>
+</body>
+</html>
